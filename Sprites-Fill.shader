@@ -67,21 +67,20 @@
             fixed4 SampleSpriteTexture(float2 uv)
             {
                 fixed4 color = tex2D(_MainTex, uv);
-                float orientation = _FillOrientation, amount = _FillAmount, method = _FillMethod;
                 float2 diff = float2(uv.x - 0.5, uv.y - 0.5);
                 float theta = atan(diff.y / diff.x);
-                float sign = lerp(-1, 1, orientation);
+                float sign = lerp(-1, 1, _FillOrientation);
                 const float PI = radians(180);
-                color.a *= lerp(lerp(step(uv.x, amount), step(1 - amount, uv.x), orientation),// 水平填充
-                                lerp(lerp(step(uv.y, amount), step(1 - amount, uv.y), orientation),// 垂直填充
+                color.a *= lerp(lerp(step(uv.x, _FillAmount), step(1 - _FillAmount, uv.x), _FillOrientation),// 水平填充
+                                lerp(lerp(step(uv.y, _FillAmount), step(1 - _FillAmount, uv.y), _FillOrientation),// 垂直填充
                                      lerp(lerp(step(theta, (_FillAmount * 2 - 0.5) * PI),// 环形360 以中心为轴 填充
-                                               step(- (2 * _FillAmount - 0.5) * PI, theta), orientation) *
+                                               step(- (2 * _FillAmount - 0.5) * PI, theta), _FillOrientation) *
                                           step(0, sign * diff.x),
                                           lerp(lerp(step(theta, (2 * (_FillAmount - 0.5) - 0.5) * PI),
-                                                    step(- (2 * (_FillAmount - 0.5) - 0.5) * PI, theta), orientation),
+                                                    step(- (2 * (_FillAmount - 0.5) - 0.5) * PI, theta), _FillOrientation),
                                                1, step(0, sign * diff.x)), step(0.5, _FillAmount)),
-                                     step(2, method)),
-                                step(1, method));
+                                     step(2, _FillMethod)),
+                                step(1, _FillMethod));
                 return color;
             }
 
