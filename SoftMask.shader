@@ -76,12 +76,8 @@
                 v2f o;
                 o.vertex = UnityObjectToClipPos(i.vertex);
                 o.texcoord0 = i.texcoord;
-                float4 uv = float4(0, 0, 0, 1);
-                uv = mul(unity_ObjectToWorld, uv);
+                float4 uv = mul(unity_ObjectToWorld, i.vertex);
                 uv = mul(_SoftMaskMatrix, uv);
-                float2 factor = float2(unity_WorldToObject._11 / _SoftMaskMatrix._11,
-                                       unity_WorldToObject._22 / _SoftMaskMatrix._22);
-                uv.xy = i.vertex.xy / factor + uv.xy;
                 uv.x /= _SoftMaskRect.x;
                 uv.y /= _SoftMaskRect.y;
                 uv.x += _SoftMaskRect.z;
@@ -105,4 +101,5 @@
             ENDCG
         }
     }
+
 }
