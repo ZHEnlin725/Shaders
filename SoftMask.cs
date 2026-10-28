@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using FairyGUI;
 using UnityEngine;
-
 public class SoftMask : MonoBehaviour
 {
     private class MaskedEntry
     {
         public bool changed;
+        public bool maskedMaterial;
         public DisplayObject displayObject;
-        public Material maskedMaterial;
     }
 
     public string maskedShader = "SoulGames/SoftMask";
@@ -28,7 +27,9 @@ public class SoftMask : MonoBehaviour
         }
     }
 
-    private readonly List<MaskedEntry> maskedEntries = new List<MaskedEntry>();
+    private MaterialPropertyBlock materialPropertyBlock;
+    private readonly List<MaskedEntry> maskedEntries = new();
+    private readonly Dictionary<Texture, Material> overridedMaterials = new();
 
     private static readonly int Softness = Shader.PropertyToID("_Softness");
     private static readonly int SoftMaskTex = Shader.PropertyToID("_SoftMaskTex");
@@ -102,26 +103,33 @@ public class SoftMask : MonoBehaviour
         if (maskTex == null)
             maskTex = ResourceManager.LoadTexture("Assets/Art/TextureSingle/UI/soft.png");
 
-        Matrix4x4 matrix = default;
+        materialPropertyBlock ??= new MaterialPropertyBlock();
+        var matrix = cachedTransform.worldToLocalMatrix;
         var count = maskedEntries.Count;
         for (var i = 0; i < count; i++)
         {
-            var maskedMaterial = maskedEntries[i].maskedMaterial;
 #if UNITY_EDITOR
             // debug 调试用
-            if (maskedMaterial != null)
-                maskedMaterial.SetFloat(Softness, softness);
+            // if (maskedMaterial)
+            // maskedMaterial.SetFloat(Softness, softness);
 #endif
-            if (!maskedEntries[i].changed) continue;
-            if (maskedMaterial == null)
+            
+            var maskedEntry = maskedEntries[i];
+            if (!maskedEntry.changed) continue;
+            var displayObject = maskedEntry.displayObject;
+            var graphics = displayObject.graphics;
+            if (graphics == null) continue;
+            if (maskedEntry.displayObject.gameObject.name.Contains("NumberTxt"))
             {
-                var displayObject = maskedEntries[i].displayObject;
-                var graphics = displayObject.graphics;
-                if (maskedEntries[i].displayObject.gameObject.name.Contains("NumberTxt"))
-                {
-                    Debug.LogError($"numberTxt {graphics} {displayObject.paintingGraphics}");
-                }
-                if (graphics != null)
+                Debug.LogError($"numberTxt {graphics} {displayObject.paintingGraphics}");
+            }
+
+            var meshRenderer = graphics.meshRenderer;
+            if (meshRenderer == null) continue;
+            if (!maskedEntry.maskedMaterial)
+            {
+                var mainTexture = graphics.material.mainTexture;
+                if (!overridedMaterials.TryGetValue(mainTexture, out var sharedMaterial))
                 {
                     Shader shader;
 #if UNITY_EDITOR
@@ -130,20 +138,24 @@ public class SoftMask : MonoBehaviour
                     shader = ResourceManager.LoadResource("Assets/EditorShader/SoulShader/Other/SoftMask.shader",
                         typeof(Shader)) as Shader;
 #endif
-                    maskedMaterial = new Material(shader);
-                    graphics.SetMaterial(maskedMaterial);
-                    maskedMaterial.SetTexture(SoftMaskTex, maskTex);
-                    maskedEntries[i].maskedMaterial = maskedMaterial;
+                    sharedMaterial = new Material(shader);
+                    overridedMaterials[mainTexture] = sharedMaterial;
                 }
+
+                graphics.SetMaterial(sharedMaterial);
+                maskedEntry.maskedMaterial = true;
             }
 
-            if (maskedMaterial != null)
+            if (maskedEntry.maskedMaterial)
             {
-                if (matrix == default) matrix = cachedTransform.worldToLocalMatrix;
-                maskedMaterial.SetFloat(Softness, softness);
-                maskedMaterial.SetVector(SoftMaskRect, maskRect);
-                maskedMaterial.SetMatrix(SoftMaskMatrix, matrix);
-                maskedEntries[i].changed = false;
+                //Todo Unity6.3以上 使用Renderer.SetShaderUserValue
+                meshRenderer.GetPropertyBlock(materialPropertyBlock);
+                materialPropertyBlock.SetTexture(SoftMaskTex, maskTex);
+                materialPropertyBlock.SetFloat(Softness, softness);
+                materialPropertyBlock.SetVector(SoftMaskRect, maskRect);
+                materialPropertyBlock.SetMatrix(SoftMaskMatrix, matrix);
+                meshRenderer.SetPropertyBlock(materialPropertyBlock);
+                maskedEntry.changed = false;
             }
         }
     }
@@ -161,5 +173,6 @@ public class SoftMask : MonoBehaviour
     {
         ResourceManager.UnloadTexture(maskTex);
         maskedEntries.Clear();
+        overridedMaterials.Clear();
     }
 }
